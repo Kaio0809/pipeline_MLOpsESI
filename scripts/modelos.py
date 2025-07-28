@@ -25,6 +25,19 @@ warnings.filterwarnings('ignore')
 
 # Função de avaliação e salvamento de relatórios
 def avaliar_modelo_multiclasse(modelo, X_test, y_test, nome_modelo='Modelo'):
+    """
+    Avalia um modelo de classificação multiclasse usando várias métricas,
+    gera matriz de confusão, salva relatório e retorna as métricas.
+
+    Parâmetros:
+    - modelo: pipeline treinado com método predict()
+    - X_test: dados de teste (features)
+    - y_test: dados de teste (rótulos verdadeiros)
+    - nome_modelo: nome para usar em arquivos e prints (default='Modelo')
+
+    Retorna:
+    - dicionário com métricas (acurácia, F1, precisão, recall)
+    """
     y_pred = modelo.predict(X_test)
 
     acc = accuracy_score(y_test, y_pred)
@@ -64,8 +77,31 @@ def avaliar_modelo_multiclasse(modelo, X_test, y_test, nome_modelo='Modelo'):
     }
 
 # Pipeline com organização de arquivos e treinamento
-def NCV_treinar_modelos_robustos(df, nome_alvo, colunas_numericas, colunas_onehot,
-                                test_size=0.2, random_state=42, n_iter_nn=20):
+def NCV_treinar_modelos_robustos(df, nome_alvo, colunas_numericas, colunas_onehot,test_size=0.2, random_state=42, n_iter_nn=20):
+    """
+    Pipeline robusto para treinar e avaliar múltiplos modelos de classificação multiclasse.
+    Realiza:
+     - Separação treino/teste estratificada
+     - Pré-processamento numérico e categórico
+     - Balanceamento com SMOTE para classes desbalanceadas
+     - Busca de hiperparâmetros com GridSearchCV e RandomizedSearchCV
+     - Avaliação detalhada e geração de relatórios/matrizes de confusão
+     - Salvamento dos resultados e do melhor modelo treinado
+
+    Parâmetros:
+    - df: DataFrame com os dados completos (features + target)
+    - nome_alvo: nome da coluna alvo (target)
+    - colunas_numericas: lista com nomes das colunas numéricas
+    - colunas_onehot: lista com nomes das colunas categóricas para "one-hot" ou passthrough
+    - test_size: proporção de dados reservada para teste (default 0.2)
+    - random_state: semente para reprodução (default 42)
+    - n_iter_nn: número de iterações para RandomizedSearch da rede neural (se ativada)
+
+    Retorna:
+    - DataFrame com resultados resumidos dos modelos
+    - Pipeline do melhor modelo treinado (já fitado)
+    - Nome do melhor modelo
+    """                              
 
     # Criar pastas
     os.makedirs("resultados", exist_ok=True)
@@ -146,20 +182,20 @@ def NCV_treinar_modelos_robustos(df, nome_alvo, colunas_numericas, colunas_oneho
                 'classifier__max_depth': [None, 10, 20]
             },
             RandomizedSearchCV
+        ),
+        'Rede_Neural': (
+            MLPClassifier(max_iter=1000, random_state=random_state),
+            {
+                'classifier__hidden_layer_sizes': [(100, 50), (128, 64), (64, 32, 16)],
+                'classifier__activation': ['relu', 'tanh'],
+                'classifier__solver': ['adam', 'sgd'],
+                'classifier__alpha': [0.01, 0.001],
+                'classifier__batch_size': [128,64],
+                'classifier__learning_rate_init': [0.05, 0.001],
+                'classifier__momentum': [0.9, 0.95],
+            },
+            lambda *args, **kwargs: RandomizedSearchCV(*args, n_iter=n_iter_nn, **kwargs)
         )
-#        'Rede_Neural': (
-#            MLPClassifier(max_iter=1000, random_state=random_state),
-#            {
-#                'classifier__hidden_layer_sizes': [(100, 50), (128, 64), (64, 32, 16)],
-#                'classifier__activation': ['relu', 'tanh'],
-#                'classifier__solver': ['adam', 'sgd'],
-#                'classifier__alpha': [0.01, 0.001],
-#                'classifier__batch_size': [128,64],
-#                'classifier__learning_rate_init': [0.05, 0.001],
-#                'classifier__momentum': [0.9, 0.95],
-#            },
-#            lambda *args, **kwargs: RandomizedSearchCV(*args, n_iter=n_iter_nn, **kwargs)
-#        )
     }
 
     resultados = []
@@ -220,6 +256,13 @@ def NCV_treinar_modelos_robustos(df, nome_alvo, colunas_numericas, colunas_oneho
         
 
 def main():
+    """
+    Função principal que:
+    - lê o dataset
+    - define as colunas numéricas e categóricas
+    - chama o pipeline para treinar e avaliar os modelos
+    """
+    
     df = pd.read_csv("dados/dataset_filmes_class.csv") 
 
     colunas_numericas = ['ano_lancamento',
